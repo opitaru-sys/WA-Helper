@@ -1,5 +1,5 @@
 require('dotenv').config();
-const fs = require('fs');
+const { execSync } = require('child_process');
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
@@ -9,17 +9,15 @@ const sessionPath = process.env.SESSION_DATA_PATH || './.wwebjs_auth';
 
 let executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
 if (!executablePath) {
-  const possiblePaths = [
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome'
-  ];
-  for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      executablePath = p;
-      break;
-    }
+  try {
+    executablePath = execSync('which chromium || which chromium-browser || which google-chrome', { encoding: 'utf-8' }).trim();
+    console.log('Using detected Chromium path:', executablePath);
+  } catch (err) {
+    console.log('Failed to detect Chromium path via which command:', err.message);
+    executablePath = '/usr/bin/chromium-browser'; // Fallback
   }
+} else {
+  console.log('Using provided Chromium path via env:', executablePath);
 }
 
 const client = new Client({
