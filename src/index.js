@@ -1,9 +1,5 @@
 require('dotenv').config();
 
-// Ensure Puppeteer stores and finds the Chrome binary in Render's persistent cache
-if (!process.env.PUPPETEER_CACHE_DIR) {
-  process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
-}
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
@@ -14,6 +10,7 @@ const sessionPath = process.env.SESSION_DATA_PATH || './.wwebjs_auth';
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: sessionPath }),
   puppeteer: {
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
     headless: true,
     args: [
       '--no-sandbox',
