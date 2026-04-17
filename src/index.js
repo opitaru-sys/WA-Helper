@@ -1,5 +1,9 @@
 require('dotenv').config();
-const { execSync } = require('child_process');
+
+// Ensure Puppeteer stores and finds the Chrome binary in Render's persistent project directory
+if (!process.env.PUPPETEER_CACHE_DIR) {
+  process.env.PUPPETEER_CACHE_DIR = '/opt/render/project/src/.cache/puppeteer';
+}
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
@@ -7,23 +11,9 @@ const { handleMessage } = require('./messageHandler');
 
 const sessionPath = process.env.SESSION_DATA_PATH || './.wwebjs_auth';
 
-let executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-if (!executablePath) {
-  try {
-    executablePath = execSync('which chromium || which chromium-browser || which google-chrome', { encoding: 'utf-8' }).trim();
-    console.log('Using detected Chromium path:', executablePath);
-  } catch (err) {
-    console.log('Failed to detect Chromium path via which command:', err.message);
-    executablePath = '/usr/bin/chromium-browser'; // Fallback
-  }
-} else {
-  console.log('Using provided Chromium path via env:', executablePath);
-}
-
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: sessionPath }),
   puppeteer: {
-    executablePath: executablePath || '/usr/bin/chromium-browser',
     headless: true,
     args: [
       '--no-sandbox',

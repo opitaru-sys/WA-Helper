@@ -4,7 +4,7 @@
   "description": "Proactive WhatsApp household assistant for Ilana & Omri",
   "main": "src/index.js",
   "scripts": {
-    "build": "apt-get install -y chromium-browser && npm install",
+    "build": "PUPPETEER_CACHE_DIR=/opt/render/project/src/.cache/puppeteer npx puppeteer browsers install chrome",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "init-sheets": "node src/initSheets.js",
