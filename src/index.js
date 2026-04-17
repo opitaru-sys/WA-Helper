@@ -39,6 +39,7 @@ async function connectToWhatsApp() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
+      console.log('RAW QR String:', qr);
       console.log('\n📱 Scan this QR code with WhatsApp:\n');
       qrcode.generate(qr, { small: true });
       console.log('\nWaiting for scan...\n');
@@ -46,7 +47,8 @@ async function connectToWhatsApp() {
 
     if (connection === 'close') {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.error(`❌ Connection closed. Reconnecting: ${shouldReconnect}`);
+      const errorMsg = lastDisconnect?.error?.message || lastDisconnect?.error || 'Unknown error';
+      console.error(`❌ Connection closed due to: ${errorMsg}. Reconnecting: ${shouldReconnect}`);
       if (shouldReconnect) {
         setTimeout(connectToWhatsApp, 5000);
       } else {
