@@ -1,0 +1,25 @@
+{
+  "name": "whatsapp-household-bot",
+  "version": "1.0.0",
+  "description": "Proactive WhatsApp household assistant for Ilana & Omri",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "init-sheets": "node src/initSheets.js",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.0",
+    "@google/generative-ai": "^0.21.0",
+    "@octokit/rest": "^21.0.2",
+    "airtable": "^0.12.2",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
