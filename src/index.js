@@ -1,18 +1,18 @@
 require('dotenv').config();
-const fs = require('fs');
+
+if (!process.env.PUPPETEER_CACHE_DIR) {
+  process.env.PUPPETEER_CACHE_DIR = '/opt/render/project/src/.cache/puppeteer';
+}
+
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { handleMessage } = require('./messageHandler');
 
 const sessionPath = process.env.SESSION_DATA_PATH || './.wwebjs_auth';
 
-const configuredPath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
-const resolvedExecutablePath = fs.existsSync(configuredPath) ? configuredPath : undefined;
-
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: sessionPath }),
   puppeteer: {
-    executablePath: resolvedExecutablePath,
     headless: true,
     args: [
       '--no-sandbox',

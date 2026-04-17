@@ -4,6 +4,7 @@
   "description": "Proactive WhatsApp household assistant for Ilana & Omri",
   "main": "src/index.js",
   "scripts": {
+    "build": "npx puppeteer browsers install chrome",
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "init-sheets": "node src/initSheets.js",
