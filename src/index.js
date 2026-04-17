@@ -1,5 +1,5 @@
 require('dotenv').config();
-
+const fs = require('fs');
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
@@ -7,10 +7,25 @@ const { handleMessage } = require('./messageHandler');
 
 const sessionPath = process.env.SESSION_DATA_PATH || './.wwebjs_auth';
 
+let executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+if (!executablePath) {
+  const possiblePaths = [
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome'
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      executablePath = p;
+      break;
+    }
+  }
+}
+
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: sessionPath }),
   puppeteer: {
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+    executablePath: executablePath || '/usr/bin/chromium-browser',
     headless: true,
     args: [
       '--no-sandbox',
