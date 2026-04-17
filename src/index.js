@@ -1,97 +1,115 @@
 require('dotenv').config();
-
-// Ensure Puppeteer stores and finds the Chrome binary in Render's persistent project directory
-if (!process.env.PUPPETEER_CACHE_DIR) {
-  process.env.PUPPETEER_CACHE_DIR = '/opt/render/project/src/.cache/puppeteer';
-}
-
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
+const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const { handleMessage } = require('./messageHandler');
 
 const sessionPath = process.env.SESSION_DATA_PATH || './.wwebjs_auth';
 
-const client = new Client({
-  authStrategy: new LocalAuth({ dataPath: sessionPath }),
-  puppeteer: {
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-      '--disable-gpu',
-    ],
-  },
-});
+async function connectToWhatsApp() {
+  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
-client.on('qr', (qr) => {
-  console.log('\n📱 Scan this QR code with WhatsApp:\n');
-  qrcode.generate(qr, { small: true });
-  console.log('\nWaiting for scan...\n');
-});
+  const sock = makeWASocket({
+    auth: state,
+    logger: pino({ level: 'silent' }),
+    printQRInTerminal: false,
+    browser: Browsers.macOS('Desktop'),
+    syncFullHistory: false
+  });
 
-client.on('authenticated', () => {
-  console.log('✅ WhatsApp authenticated successfully');
-});
+  sock.ev.on('creds.update', saveCreds);
 
-client.on('auth_failure', (msg) => {
-  console.error('❌ Authentication failed:', msg);
-  process.exit(1);
-});
+  // Client adapter for messageHandler.js
+  const adapterClient = {
+    getChats: async () => {
+      try {
+        const groups = await sock.groupFetchAllParticipating();
+        return Object.values(groups).map((g) => ({
+          isGroup: true,
+          name: g.subject,
+          id: { _serialized: g.id }
+        }));
+      } catch (e) {
+        return [];
+      }
+    }
+  };
 
-client.on('ready', async () => {
-  console.log('🤖 Household bot is online and listening...');
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect, qr } = update;
 
-  // Print all group chat IDs so you can find your group's ID
-  const chats = await client.getChats();
-  const groups = chats.filter((c) => c.isGroup);
-  if (groups.length > 0) {
-    console.log('\n📋 Available group chats:');
-    groups.forEach((g) => console.log(`  "${g.name}" → ${g.id._serialized}`));
-    console.log('\nCopy your group ID into WHATSAPP_GROUP_ID in .env\n');
-  }
+    if (qr) {
+      console.log('\n📱 Scan this QR code with WhatsApp:\n');
+      qrcode.generate(qr, { small: true });
+      console.log('\nWaiting for scan...\n');
+    }
 
-  // Start Phase 2 pattern detector if enabled
-  if (process.env.ENABLE_PHASE2 === 'true') {
-    const { startPatternDetector } = require('./phase2/patternDetector');
-    startPatternDetector(client);
-    console.log('[Phase2] Self-improvement module active');
-  }
-});
+    if (connection === 'close') {
+      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      console.error(`❌ Connection closed. Reconnecting: ${shouldReconnect}`);
+      if (shouldReconnect) {
+        setTimeout(connectToWhatsApp, 5000);
+      } else {
+        console.log('Logged out from WhatsApp. Delete session and rescan.');
+        process.exit(1);
+      }
+    } else if (connection === 'open') {
+      console.log('✅ WhatsApp authenticated successfully');
+      console.log('🤖 Household bot is online and listening...');
+      
+      sock.groupFetchAllParticipating().then(groups => {
+        const groupList = Object.values(groups);
+        if (groupList.length > 0) {
+          console.log('\n📋 Available group chats:');
+          groupList.forEach(g => console.log(`  "${g.subject}" → ${g.id}`));
+          console.log('\nCopy your group ID into WHATSAPP_GROUP_ID in .env\n');
+        }
+      }).catch(err => console.error('Failed to fetch groups:', err));
 
-client.on('message', async (msg) => {
-  console.log(`[message]        from=${msg.from}  fromMe=${msg.fromMe}  type=${msg.type}`);
-  try {
-    await handleMessage(msg, client);
-  } catch (err) {
-    console.error('Unhandled error in message handler:', err);
-  }
-});
+      if (process.env.ENABLE_PHASE2 === 'true') {
+        const { startPatternDetector } = require('./phase2/patternDetector');
+        startPatternDetector(adapterClient);
+        console.log('[Phase2] Self-improvement module active');
+      }
+    }
+  });
 
-// Also process messages sent FROM this account (e.g. Omri writing from his phone
-// while the bot runs on his session). The standard 'message' event only fires for
-// incoming messages; 'message_create' fires for everything including self-sent.
-client.on('message_create', async (msg) => {
-  console.log(`[message_create] from=${msg.from}  fromMe=${msg.fromMe}  type=${msg.type}`);
-  if (!msg.fromMe) return; // 'message' already handles the other side
-  try {
-    await handleMessage(msg, client);
-  } catch (err) {
-    console.error('Unhandled error in message_create handler:', err);
-  }
-});
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
 
-client.on('disconnected', (reason) => {
-  console.error('❌ Client disconnected:', reason);
-  console.log('Restarting in 5 seconds...');
-  setTimeout(() => {
-    client.initialize();
-  }, 5000);
-});
+    for (const m of messages) {
+      if (!m.message) continue;
+
+      const isFromMe = m.key.fromMe;
+      const remoteJid = m.key.remoteJid;
+      const textBody = m.message?.conversation || m.message?.extendedTextMessage?.text || '';
+
+      const msgAdapter = {
+        id: { _serialized: m.key.id },
+        fromMe: isFromMe,
+        from: remoteJid,
+        type: textBody ? 'chat' : 'other',
+        body: textBody,
+        timestamp: m.messageTimestamp,
+        getChat: async () => ({ id: { _serialized: remoteJid } }),
+        getContact: async () => ({ id: { _serialized: remoteJid }, pushname: m.pushName || 'Unknown' }),
+        reply: async (text) => {
+          const sent = await sock.sendMessage(remoteJid, { text }, { quoted: m });
+          return { id: { _serialized: sent?.key?.id } };
+        }
+      };
+
+      const eventName = isFromMe ? 'message_create' : 'message';
+      console.log(`[${eventName}]     from=${remoteJid}  fromMe=${isFromMe}  type=${msgAdapter.type}`);
+
+      try {
+        await handleMessage(msgAdapter, adapterClient);
+      } catch (err) {
+        console.error(`Unhandled error in ${eventName} handler:`, err);
+      }
+    }
+  });
+}
 
 console.log('🚀 Initializing WhatsApp client...');
-client.initialize();
+connectToWhatsApp();
