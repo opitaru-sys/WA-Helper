@@ -1,4 +1,10 @@
 require('dotenv').config();
+
+// Ensure Puppeteer stores and finds the Chrome binary in Render's persistent cache
+if (!process.env.PUPPETEER_CACHE_DIR) {
+  process.env.PUPPETEER_CACHE_DIR = '/opt/render/.cache/puppeteer';
+}
+
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { handleMessage } = require('./messageHandler');
