@@ -7,6 +7,16 @@ if (!process.env.PUPPETEER_CACHE_DIR) {
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { handleMessage } = require('./messageHandler');
+const http = require('http');
+
+// Render port detection requirement
+const port = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('OK');
+}).listen(port, () => {
+  console.log(`🌐 Minimal HTTP server listening on port ${port}`);
+});
 
 const sessionPath = process.env.SESSION_DATA_PATH || './.wwebjs_auth';
 
