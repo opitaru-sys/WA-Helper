@@ -38,8 +38,11 @@ const client = new Client({
 });
 
 client.on('qr', (qr) => {
+  console.log('\n📱 RAW QR String:', qr);
   console.log('\n📱 Scan this QR code with WhatsApp:\n');
-  qrcode.generate(qr, { small: true });
+  qrcode.generate(qr, { small: true }, (code) => {
+    console.log(code);
+  });
   console.log('\nWaiting for scan...\n');
 });
 
